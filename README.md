@@ -1,2 +1,2 @@
 # deep_radar
-Deep learning with radar data
+Deep learning with radar data (regression)
