@@ -4,7 +4,7 @@
 #SBATCH --job-name=train-radar-counter-stft-gridsearch
 #SBATCH --nodes=1
 #SBATCH --cpus-per-task=1
-#SBATCH --mem=16GB
+#SBATCH --mem=64GB
 #SBATCH --time=7-0
 #SBATCH --mail-type=ALL
 #SBATCH --output="train-radar-counter-stft-gridsearch-%j.out"

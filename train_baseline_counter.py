@@ -7,6 +7,7 @@ import types
 import random
 import argparse
 import math
+import datetime
 import pandas as pd
 import numpy as np
 import matplotlib.pyplot as plt
@@ -38,6 +39,8 @@ parser.add_argument('-cv', type=str, default=None, help='Cross validation folds 
 parser.add_argument('-mt', type=str, default='conv1d_stft', help='type of embedding model')
 parser.add_argument('-window', type=int, default=256, help='Window length for embeddings to be extracted')
 parser.add_argument('-outdir', type=str, default=None, help='Output folder for model to be saved')
+parser.add_argument('-h1', type=int, default=None, help='Hidden units for dense_1 in lstm counting model')
+parser.add_argument('-h2', type=int, default=None, help='Hidden units for dense_2 in lstm counting model')
 #parser.add_argument('-epochs', type=int, default=10, help='Number of training epochs')
 #parser.add_argument('-lr', type=float, default=1e-4, help='Optimization learning rate')
 parser.add_argument('-tbs', type=int, default=64, help='Number of samples per training batch')
@@ -74,7 +77,7 @@ class KerasGeneratorRegressor(KerasRegressor):
         os.makedirs(output_path, exist_ok=True)
         
         #Callbacks for the training
-        early_stopping = EarlyStopping(monitor="val_loss", patience=3, min_delta=1e-4, verbose=5, mode="auto")
+        early_stopping = EarlyStopping(monitor="val_loss", patience=5, min_delta=1e-4, verbose=5, mode="auto")
         reduce_LR = ReduceLROnPlateau(monitor='val_loss', factor=0.1, patience=3)        
         #previous model naming convention: model_str+'.{epoch:02d}-{val_loss:.5f}.h5'
         model_checkpoint = ModelCheckpoint(os.path.join(output_path, 'best_val_loss_model.h5'),\
@@ -115,6 +118,11 @@ class KerasGeneratorRegressor(KerasRegressor):
                                                   callbacks=callbacks)
         return self.__history
 
+    """
+    When score_func is a score function (default), higher value is good. 
+    When it is a loss function, the lower the value, the better it is.
+    In the latter case, the scorer object will sign-flip the outcome of the score_func.
+    """
     def score(self, x, y, **kwargs):
         """Returns the mean loss on the given test data and labels.
         # Arguments
@@ -165,7 +173,7 @@ def lstm_embedding_model(hidden1, hidden2=None, num_layers=1, reshape=None):
     return model
 
 def lstm_counting_model(model, count_hidden1, count_dense1, count_dense2,\
-                        kernel_initializer='normal', optimizer=None, learning_rate=0.001, dropout=None):
+                        kernel_initializer='glorot_uniform', optimizer=None, learning_rate=0.0001, dropout=0.2):
     
     if optimizer == 'adam' or optimizer is None:
         adam = keras.optimizers.Adam(lr=learning_rate)
@@ -177,27 +185,9 @@ def lstm_counting_model(model, count_hidden1, count_dense1, count_dense2,\
     model.add(Dense(count_dense2, activation='relu', kernel_initializer=kernel_initializer, name='counting_dense_2'))
     model.add(Dense(1, kernel_initializer=kernel_initializer, name='output'))
     model.add(Activation('linear'))
-    model.compile(loss='mean_squared_error', optimizer=adam, metrics=['mae'])
+    model.compile(loss='poisson', optimizer=adam, metrics=['mae'])
     return model
     
-
-def lstm_stft_test_keys():
-    epochs = [1] #[10, 20, 30]
-    lr = [1e-2] #[1e-3, 1e-4, 1e-5]
-    init = ['glorot_uniform']
-    optimizers = ['adam']
-    dropout = [0.2] #[0.2, 0.4]
-    hidden1 = [32] #[32, 64]
-    hidden2 = [32] #[32, 64]
-    count_hidden1 = [32] #[32, 64]
-    count_dense1 = [32] #[32, 64, 128]
-    count_dense2 = [64] #[32, 64]
-    param_grid = dict(epochs=epochs, hidden1=hidden1, hidden2=hidden2,\
-                      count_hidden1=count_hidden1, init=init,\
-                      count_dense1=count_dense1, count_dense2=count_dense2,\
-                      lr=lr, optimizer=optimizers, dropout=dropout)
-    return param_grid
-
 def conv1d_stft_test_keys():
     epochs = [1]
     lr = [1e-2]
@@ -216,25 +206,49 @@ def conv1d_stft_test_keys():
                       lr=lr, optimizer=optimizers, dropout=dropout)
     return param_grid
     
-def lstm_stft_keys():
-    epochs = [50]
-    lr = [1e-4, 1e-5]
-    init = ['glorot_uniform', 'normal']
+def lstm_stft_test_keys(args):
+    epochs = [50] #[10, 20, 30]
+    lr = [1e-4] #[1e-3, 1e-4, 1e-5]
+    init = ['glorot_uniform']
     optimizers = ['adam']
-    dropout = [0.2, 0.4]
-    hidden1 = [32, 64]
-    count_hidden1 = [32, 64]
-    count_dense1 = [32, 64, 128]
-    count_dense2 = [32, 16]
+    dropout = [0.2] #[0.2, 0.4]
+    hidden1 = [64] #[32, 64]
+    #hidden2 = [32] #[32, 64]
+    count_hidden1 = [32] #[32, 64]
+    count_dense1 = [64] #[32, 64, 128]
+    count_dense2 = [16] #[32, 64]
     param_grid = dict(epochs=epochs, hidden1=hidden1,\
                       count_hidden1=count_hidden1, init=init,\
                       count_dense1=count_dense1, count_dense2=count_dense2,\
                       lr=lr, optimizer=optimizers, dropout=dropout)
     return param_grid
 
+def lstm_stft_keys(args):
+    epochs = [50]
+    #lr = [1e-4, 1e-5]
+    #init = ['glorot_uniform']
+    #optimizers = ['adam']
+    #dropout = [0.2, 0.4]
+    hidden1 = [32, 64]
+    count_hidden1 = [32, 64]
+    if 'h1' in args and args.h1:
+        count_dense1 = [ int(args.h1) ]
+    else:
+        count_dense1 = [32] #[32, 64]
+    if 'h2' in args and args.h2:
+        count_dense2 = [ int(args.h2) ]
+    else:
+        count_dense2 = [32] #[32, 16]
+    
+    print(count_dense1, count_dense2)
+    param_grid = dict(epochs=epochs, hidden1=hidden1,\
+                      count_hidden1=count_hidden1,\
+                      count_dense1=count_dense1, count_dense2=count_dense2)
+    return param_grid
+
 def build_lstm_stft_model(hidden1, count_hidden1, count_dense1, count_dense2,\
                           init='normal', hidden2=None,\
-                          lr=1e-2, optimizer='adam', dropout=None):
+                          lr=1e-4, optimizer='adam', dropout=None):
     
     model = lstm_embedding_model(hidden1, hidden2=hidden2)
     counting_model = lstm_counting_model(model, count_hidden1,\
@@ -244,8 +258,8 @@ def build_lstm_stft_model(hidden1, count_hidden1, count_dense1, count_dense2,\
     return counting_model
     
 def build_lstm_time_model(hidden1, count_hidden1, count_dense1, count_dense2,\
-                          init='normal', hidden2=None,\
-                          lr=1e-2, optimizer='adam', dropout=None):
+                          init='glorot_uniform', hidden2=None,\
+                          lr=1e-4, optimizer='adam', dropout=0.2):
     
     model = lstm_embedding_model(hidden1, hidden2=hidden2, reshape=(-1, 2))
     counting_model = lstm_counting_model(model, count_hidden1,\
@@ -316,8 +330,8 @@ models = {
 }
 
 params = {
-    'lstm_stft': lstm_stft_keys(),
-    'lstm_time': lstm_stft_keys()
+    'lstm_stft': lstm_stft_keys(args),
+    'lstm_time': lstm_stft_test_keys(args)
 }
 
 model = KerasGeneratorRegressor(build_fn=models[model_type], verbose=1)
@@ -338,14 +352,16 @@ params = grid_result.cv_results_['params']
 for mean, stdev, param in zip(means, stds, params):
     print("{} {} with: {}".format(mean, stdev, param))
 
-print('Loss on Test set')
 score = grid.score(x_test, y_test)
-print(score)
+print('Loss on Test set: ', -score)
 
 sort_by='mean_test_score'
+unique_ts = datetime.datetime.now().strftime("%Y%m%d%H%M%S")
+out_file = 'summary_' + str(unique_ts) + '.csv'
+
 frame = pd.DataFrame(grid_result.cv_results_)
 df = frame.filter(regex='^(?!.*param_).*$')
 df = df.sort_values([sort_by], ascending=False)
 df = df.reset_index()
 df = df.drop(['rank_test_score', 'index'], 1)
-df.to_csv(os.path.join(output_path, 'summary.csv'), index=False)
+df.to_csv(os.path.join(output_path, out_file), index=False)
