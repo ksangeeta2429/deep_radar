@@ -116,3 +116,16 @@ class val_generator(keras.utils.Sequence):
         label[0] = self.y[idx]
         #print(x.shape)
         return x, label
+
+class test_generator(keras.utils.Sequence): 
+    def __len__(self):
+        """Denotes the number of batches per epoch"""
+        return self.n_bins
+    
+    def __init__(self, data, labels): 
+        self.x, self.y = data, labels
+        self.n_bins = data.shape[0]
+        
+    def __getitem__(self, idx):
+        x = self.x[idx].reshape(1, self.x[idx].shape[0], self.x[idx].shape[1])
+        return x
