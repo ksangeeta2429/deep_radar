@@ -111,6 +111,7 @@ if True:
     loss = 'nll'
     model_type = 'lstm_time'
     base_path = '/scratch/sk7898/pedbike/window_256'
+    batch_size = 64
 
 if data_type == 'stft':
     fileloc = os.path.join(base_path, 'downstream_stft')
@@ -118,20 +119,18 @@ elif data_type == 'time':
     fileloc = os.path.join(base_path, 'downstream_time')
 else:
     raise ValueError('Only stft/time are valid data types')
-    
+
 x_train, x_val, x_test, y_train, y_val, y_test, seqs_train, seqs_val, seqs_test = get_data(fileloc)
+assert x_train.shape[0] == y_train.shape[0] == seqs_train.shape[0]
+
 n_bins = int(len(seqs_train)/batch_size)
-    
-assert x_train.shape[0] == y_train.shape[0] == seqs_train.shape[0]    
-
-n_timesteps, n_features = None, window*2
-input_shape=(n_timesteps, n_features)
-
 train_gen = train_generator(n_bins, x_train, y_train, seq_lengths=seqs_train, padding=True, padding_value=0.0)
 val_gen = val_generator(x_val, y_val)
 test_gen = val_generator(x_test, y_test)
 
-batch_size = 64
+n_timesteps, n_features = None, window*2
+input_shape=(n_timesteps, n_features)
+
 epochs = 50
 lr = 1e-4
 optimizer = 'adam'

@@ -81,10 +81,9 @@ else:
     raise ValueError('Only stft/time are valid data types')
     
 x_train, x_val, x_test, y_train, y_val, y_test, seqs_train, seqs_val, seqs_test = get_data(fileloc)
-n_bins = int(len(seqs_train)/batch_size)
-    
 assert x_train.shape[0] == y_train.shape[0] == seqs_train.shape[0]    
 
+n_bins = int(len(seqs_train)/batch_size)
 n_timesteps, n_features = None, window*2
 input_shape=(n_timesteps, n_features)
 
@@ -105,10 +104,10 @@ output_path = os.path.join('/scratch/sk7898/radar_counting/models/' + loss, mode
 os.makedirs(output_path, exist_ok=True)
 
 #Callbacks for the training
-early_stopping = EarlyStopping(monitor="val_loss", patience=4 min_delta=1e-4, verbose=5, mode="auto")
+early_stopping = EarlyStopping(monitor='val_loss', patience=4, min_delta=1e-4, verbose=5, mode="auto")
 reduce_LR = ReduceLROnPlateau(monitor='val_loss', factor=0.1, patience=4)        
 model_checkpoint = ModelCheckpoint(os.path.join(output_path, 'best_val_loss_model.h5'),\
-                                   monitor="val_loss", verbose=5, save_best_only=True, mode="auto")
+                                   monitor='val_loss', verbose=5, save_best_only=True, mode="auto")
 callbacks = [early_stopping, reduce_LR, model_checkpoint]
         
 model = build_lstm_time_model(hidden_1, hidden_2, counting_hidden_1,\
