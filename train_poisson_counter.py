@@ -22,6 +22,7 @@ from keras.models import Model, Sequential
 from keras.layers.convolutional_recurrent import ConvLSTM2D
 from keras.layers.normalization import BatchNormalization
 from keras.layers import *
+from sklearn.metrics import mean_absolute_error
 from data import *
 
 def lstm_embedding_model(hidden_1, hidden_2,\
@@ -33,8 +34,6 @@ def lstm_embedding_model(hidden_1, hidden_2,\
         model.add(LSTM(hidden_1, return_sequences=True))
     else:
         model.add(LSTM(hidden_1, return_sequences=True, input_shape=input_shape))
-    if num_layers == 2:
-        model.add(LSTM(hidden_2, return_sequences=True, input_shape=input_shape))
     return model
 
 def lstm_counting_model(model, counting_hidden_1, counting_dense_1,\
@@ -42,15 +41,19 @@ def lstm_counting_model(model, counting_hidden_1, counting_dense_1,\
                         optimizer=None, learning_rate=0.001, dropout=None):
     
     if optimizer == 'adam' or optimizer is None:
-        adam = keras.optimizers.Adam(lr=learning_rate)
-    
-    model.add(Masking(mask_value=0.0, name='mask'))
+        optimizer = keras.optimizers.Adam(lr=learning_rate)
+    elif optimizer == 'rmsprop':
+        optimizer = keras.optimizers.RMSprop(lr=learning_rate)
+    elif optimizer == 'sgd':
+        optimizer = keras.optimizers.SGD(lr=learning_rate, decay=1e-6, momentum=0.9, nesterov=True)
+        
+    #model.add(Masking(mask_value=0.0, name='mask'))
     model.add(LSTM(counting_hidden_1, return_sequences=False, name='counting_lstm_1'))
-    model.add(Dense(counting_dense_1, activation='relu', kernel_initializer=kernel_initializer, name='counting_dense_1'))
-    model.add(Dense(counting_dense_2, activation='relu', kernel_initializer=kernel_initializer, name='counting_dense_2'))
-    model.add(Dense(1, kernel_initializer=kernel_initializer, name='output'))
+    #model.add(Dense(counting_dense_1, activation='relu', kernel_initializer=kernel_initializer, name='counting_dense_1'))
+    #model.add(Dense(counting_dense_2, activation='relu', kernel_initializer=kernel_initializer, name='counting_dense_2'))
+    model.add(Dense(1, name='output'))
     model.add(Activation('softplus'))
-    model.compile(loss='poisson', optimizer=adam, metrics=['mae'])
+    model.compile(loss='poisson', optimizer=optimizer)
     return model
 
 def build_lstm_time_model(hidden_1, hidden_2, counting_hidden_1,\
@@ -72,6 +75,7 @@ if True:
     model_type = 'lstm_time'
     base_path = '/scratch/sk7898/pedbike/window_256'
     batch_size = 64
+    scaling = False
 
 if data_type == 'stft':
     fileloc = os.path.join(base_path, 'downstream_stft')
@@ -80,10 +84,11 @@ elif data_type == 'time':
 else:
     raise ValueError('Only stft/time are valid data types')
     
-x_train, x_val, x_test, y_train, y_val, y_test, seqs_train, seqs_val, seqs_test = get_data(fileloc)
+x_train, x_val, x_test, y_train, y_val, y_test, seqs_train, seqs_val, seqs_test = get_data(fileloc, window=512, offset=64)
+n_bins = int(len(seqs_train)/batch_size)
+
 assert x_train.shape[0] == y_train.shape[0] == seqs_train.shape[0]    
 
-n_bins = int(len(seqs_train)/batch_size)
 n_timesteps, n_features = None, window*2
 input_shape=(n_timesteps, n_features)
 
@@ -104,8 +109,8 @@ output_path = os.path.join('/scratch/sk7898/radar_counting/models/' + loss, mode
 os.makedirs(output_path, exist_ok=True)
 
 #Callbacks for the training
-early_stopping = EarlyStopping(monitor='val_loss', patience=4, min_delta=1e-4, verbose=5, mode="auto")
-reduce_LR = ReduceLROnPlateau(monitor='val_loss', factor=0.1, patience=4)        
+early_stopping = EarlyStopping(monitor='val_loss', patience=5, min_delta=1e-4, verbose=5, mode="auto")
+reduce_LR = ReduceLROnPlateau(monitor='val_loss', factor=0.1, patience=3)        
 model_checkpoint = ModelCheckpoint(os.path.join(output_path, 'best_val_loss_model.h5'),\
                                    monitor='val_loss', verbose=5, save_best_only=True, mode="auto")
 callbacks = [early_stopping, reduce_LR, model_checkpoint]
@@ -118,10 +123,14 @@ H_train = model.fit_generator(train_gen, validation_data=val_gen, validation_ste
                               steps_per_epoch=n_bins, epochs=epochs, callbacks=callbacks)
 
 test_gen = test_generator(x_test, y_test)
-predicted_test = model.predict_generator(test_gen, steps=len(seqs_test))
-print('Predicted Test: ', predicted_test)
+test_score = model.predict_generator(test_gen, steps=len(seqs_test))
 
-test_gen = val_generator(x_test, y_test)
-H_evaluate = model.evaluate_generator(test_gen, steps=len(seqs_test))
-print('Loss:', H_evaluate[0])
-print('MAE:', H_evaluate[1])
+if scaling:
+    test_score = scaler.inverse_transform(test_score.reshape(-1, 1))
+    
+df_result = pd.DataFrame({'Actual' : [], 'Prediction' : []})
+for i in range(len(x_test)):
+    df_result = df_result.append({'Actual': y_test[i], 'Prediction': test_score[i][0]}, ignore_index=True)
+    
+print(df_result)
+print(mean_absolute_error(y_test.astype(np.int8), test_score.astype(np.int8)))
