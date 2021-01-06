@@ -18,11 +18,11 @@ def lbls_for_cls(labels, lbls_list=None):
 
     return labels_copy, labels
 
-def get_time_data(sel_cls,
+def get_time_data(data_dir,
+                  sel_cls,
                   win_len=None,
                   task_type='cls'):
     
-    data_dir = '/scratch/sk7898/deep_radar/data'
     data_path = os.path.join(data_dir, 'Data_all.npy')
     labels_path = os.path.join(data_dir, 'label_all.npy')
     data = np.load(data_path, allow_pickle=True)
@@ -75,15 +75,15 @@ def get_time_data(sel_cls,
     
     return X_train, X_test, y_train, y_test
 
-def get_fft_data(sel_cls,
+def get_fft_data(data_dir,
+                 sel_cls,
                  data_mode='amp',
                  task_type='cls',
                  scaling=True):
     
-    data_dir = '/scratch/sk7898/pedbike/fft_data'
     data_path = os.path.join(data_dir, 'Data_win_fft.npy')
     labels_path = os.path.join(data_dir, 'label_win_fft.npy')
-    seqs_path = os.path.join(data_dir, 'seqs_fft.npy')
+    seqs_path = os.path.join(data_dir, 'seqs_win_fft.npy')
     data = np.load(data_path) #shape: (18642, 256, 5)
     labels = np.load(labels_path) #shape: (18642,)
     seqs = np.load(seqs_path) #shape: (18642,)

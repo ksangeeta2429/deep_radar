@@ -1,4 +1,4 @@
-name: l3embedding-tf-2-gpu
+name: tf-2-gpu
 channels:
   - conda-forge
   - defaults
@@ -135,5 +135,5 @@ dependencies:
     - widgetsnbextension==3.5.1
     - wrapt==1.12.0
     - zipp==3.0.0
-prefix: /scratch/sk7898/miniconda3/envs/l3embedding-tf-2-gpu
+prefix: /home/ss2429/miniconda3/envs/tf-2-gpu
 

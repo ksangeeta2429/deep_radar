@@ -2,13 +2,14 @@ import warnings
 warnings.filterwarnings("ignore", category=FutureWarning)
 
 import os
+import numpy as np
 import keras
 from keras.layers import LSTM, Dense, Conv2D, Flatten, Dropout, BatchNormalization, MaxPooling2D
 from keras.callbacks import EarlyStopping, ModelCheckpoint, ReduceLROnPlateau
 from keras.models import Sequential
 from sklearn import preprocessing
 from sklearn.model_selection import train_test_split
-import numpy as np
+from data import get_fft_data
 
 def lbls_for_cls(labels, lbls_list=None):
     new_labels = [i for i in range(len(lbls_list))]
@@ -26,11 +27,11 @@ def get_model_str(sel_cls, hidden_1=64, data_mode='amp', win_len=512):
     return model_str
 
 def get_data(sel_cls,
-             data_mode='amp', 
-             task_type='cls',
-             scaling=True):
+                 data_mode='amp', 
+                 task_type='cls',
+                 scaling=True):
     
-    data_dir = '/scratch/sk7898/pedbike/fft_data'
+    data_dir = '/scratch/sk7898/radar_data/pedbike/regression_fft_data'
     data_path = os.path.join(data_dir, 'Data_win_fft.npy')
     labels_path = os.path.join(data_dir, 'label_win_fft.npy')
     seqs_path = os.path.join(data_dir, 'seqs_fft.npy')
@@ -144,10 +145,12 @@ if __name__ == '__main__':
     counting_dense_1 = 256
     counting_dense_2 = 64
 
-    cls_list = [[1, 2], [1, 3], [1, 4], [2, 3], [1, 2, 3], [1, 2, 3, 4]] #[2, 4], [1, 2, 3], [1, 2, 3, 4]
+    cls_list = [[1, 2, 3, 4]] #[2, 4], [1, 2, 3], [1, 2, 3, 4], [1, 2], [1, 3], [1, 4], [2, 3], [1, 2, 3]
     model_type = 'lstm'
     data_mode = 'amp'
-    model_dir = '/scratch/sk7898/pedbike/models'
+    radar_dir = '/scratch/sk7898/radar_data/pedbike'
+    data_dir = os.path.join(radar_dir, 'regression_fft_data')
+    model_dir = os.path.join(radar_dir, 'models')
 
     for sel_cls in cls_list:
         model_str = get_model_str(sel_cls, hidden_1=hidden_1, data_mode='amp', win_len=512)
@@ -156,7 +159,8 @@ if __name__ == '__main__':
         if not os.path.isdir(model_path):
             os.makedirs(model_path)
 
-        X_train, X_test, y_train, y_test = get_data(sel_cls=sel_cls, data_mode='amp')
+        #X_train, X_test, y_train, y_test, old_y, old_y_test, _, _ = get_fft_data(sel_cls, data_mode='amp')
+        X_train, X_test, y_train, y_test, old_y, old_y_test, _, _ = get_fft_data(data_dir, sel_cls=sel_cls, data_mode='amp')
 
         optimizer = keras.optimizers.Adam(lr=learning_rate)
         best_valid_loss_model_path = os.path.join(model_path, 'model_best_valid_loss_dp_4.h5')
