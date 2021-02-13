@@ -49,6 +49,7 @@ dependencies:
     - gsheets==0.4.1
     - h5py==2.10.0
     - httplib2==0.17.0
+    - idna==2.8
     - importlib-metadata==1.5.0
     - ipykernel==5.1.4
     - ipython==7.12.0
